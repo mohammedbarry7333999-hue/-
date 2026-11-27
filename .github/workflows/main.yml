@@ -1,3 +1,4 @@
+
 name: Build Hamada Wallet APK
 
 on:
@@ -27,34 +28,52 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install SDK
+      - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Extract Android project ZIP
         run: |
           set -e
+
           ZIP_FILE=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "لم يتم العثور على ملف ZIP للمشروع"
+            echo "ERROR: Android project ZIP was not found."
             exit 1
           fi
 
           mkdir -p extracted
+
           unzip -o "$ZIP_FILE" -d extracted
 
-          SETTINGS=$(find extracted -type f -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+          SETTINGS=$(find extracted -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
 
           if [ -z "$SETTINGS" ]; then
-            echo "لم يتم العثور على settings.gradle داخل ZIP"
+            echo "ERROR: settings.gradle was not found inside the ZIP."
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
           echo "Android project found at: $PROJECT_DIR"
+
+      - name: Fix launcher icon color resource
+        run: |
+          set -e
+
+          mkdir -p "$PROJECT_DIR/app/src/main/res/values"
+
+          cat > "$PROJECT_DIR/app/src/main/res/values/colors.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="launcher_icon_background">#090909</color>
+          </resources>
+          EOF
+
+          echo "Launcher icon background color resource fixed."
 
       - name: Build APK
         run: |
@@ -65,3 +84,4 @@ jobs:
         with:
           name: HamadaWallet-debug-apk
           path: extracted/**/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
